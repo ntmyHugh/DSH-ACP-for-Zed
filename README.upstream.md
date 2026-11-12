@@ -1,0 +1,427 @@
+<p align="center">
+  <img src="assets/acp-x-deepseek.svg" width="520" alt="Agent Client Protocol × DeepSeek Harness" />
+</p>
+
+<h1 align="center">deepseek-harness-acp</h1>
+
+<p align="center">
+  Use <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> from
+  <a href="https://agentclientprotocol.com/">Agent Client Protocol</a> clients such as
+  <a href="https://zed.dev">Zed</a> and
+  <a href="https://github.com/openma-ai/backchat">Backchat</a>.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/deepseek-harness-acp-zed"><img src="https://img.shields.io/npm/v/%40openma%2Fdeepseek-harness-acp?logo=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/deepseek-harness-acp-zed"><img src="https://img.shields.io/npm/dm/%40openma%2Fdeepseek-harness-acp" alt="npm downloads" /></a>
+  <a href="https://github.com/openma-ai/deepseek-harness-acp/actions/workflows/ci.yml"><img src="https://github.com/openma-ai/deepseek-harness-acp/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://agentclientprotocol.com/"><img src="https://img.shields.io/badge/ACP-protocol%20v1-6f42c1" alt="ACP protocol v1" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0" /></a>
+  <img src="https://img.shields.io/node/v/%40openma%2Fdeepseek-harness-acp" alt="node >= 22.15" />
+</p>
+
+---
+
+The adapter composes the harness **in-process** and maps its session-event log
+onto the full ACP vocabulary: streamed text and reasoning, tool calls with
+diffs and display terminals, plans, permission requests, session modes,
+config options, slash commands, skills, and MCP servers. Credentials never
+touch your editor config — it reuses the key you saved in the dsh Web UI, or
+`dsh-acp login` saves one to the same store.
+
+## One package, standalone or plugin
+
+| | **A · dsh profile plugin (recommended)** | **B · Standalone server** |
+|---|---|---|
+| Best for | Normal installation and upgrades | Connecting an ACP client without managing a dsh profile |
+| Install | `dsh plugin --profile acp add deepseek-harness-acp-zed@latest` | `npm i -g deepseek-harness-acp-zed` |
+| Zed runs | `dsh --profile acp` | `dsh-acp` |
+| Harness | The dsh that owns the profile | Your installed dsh, then the package's locked private runtime |
+| Composition | dsh-base + this bundle + your profile's own patches | dsh-base + this bundle (profile machinery booted in-process) |
+
+Both shapes share `$DSH_HOME`: the same credential store, settings, presets,
+and session logs as `dsh web` — conversations started in the Web UI can be
+listed and loaded from the editor.
+
+Other dsh surfaces can mount the transport-independent
+`deepseek-harness-acp-zed/plugin` on their Base Host tree and own the
+transport adapter. The TUI profile uses this path: it starts a separate TUI
+Client process and connects ACP over that process's standard stdin/stdout; it
+does not start `dsh-acp` or use an in-process Client stream.
+
+The package is therefore not only a CLI wrapper. It is also the ACP surface
+plugin used by other dsh applications: one Host composition can expose the
+same sessions, tools, presets, skills, and persistence through a transport
+chosen by the surface.
+
+### DSH compatibility
+
+This release supports **`@deepseek-ai/dsh` `>=0.1.7-rc.2`** — a minimum-version
+floor declared in `engines.dsh` (the field dsh's own plugin loader checks, with
+prereleases included), never an exact-version list. It is deliberately not a
+`@deepseek-ai/dsh` peer dependency: npm and pnpm match peer ranges without
+prereleases, so a peer floor would reject every dsh prerelease. A newer dsh is
+always attempted: API differences between dsh generations are feature-detected
+where they are used (for example dsh 0.2.1's `subagents.drainDescendants`
+versus 0.2.0's `drainContinuableDescendants`), and a dsh newer than the newest
+tested version (`0.2.1-rc.2`) only logs a warning. Only a dsh below the floor
+is refused. CI exercises the tested profile matrix (`runtime/compatibility.json`)
+plus the `next` dist-tag. The bundled runtime is
+**DSH `0.2.0-rc.2`**, including the upstream cross-process session write lock.
+
+Runtime selection has exactly two rules (Martty issue #157):
+
+- **Standalone** (`dsh-acp` bin): the packaged runtime is always used —
+  ambient installs in the invoking directory, on PATH, or in global npm are
+  never consulted. An explicit `--dsh-path`/`DSH_PATH`/`DSH_ACP_HOST`
+  (or the literal value `bundled`) selects an installation instead, and is
+  refused with a message naming the version found, its source, and the
+  supported range when it falls outside it.
+- **Plugin mode** (`dsh plugin add`, Martty launched as a dsh plugin): the
+  hosting dsh is the runtime, checked against the same range at mount time;
+  an out-of-range host fails with the same refusal message.
+
+The resolved runtime is always reported: the launcher logs
+`harness host: @deepseek-ai/dsh <version> via <source>` to stderr, and the
+`initialize` response carries `agentCapabilities._meta.dsh.runtime`
+(`{base, version, source}`) for clients to display.
+
+A competing load/resume returns a standard JSON-RPC error. Closing the
+session or exiting the owner process allows another process to resume it.
+Every process writing shared sessions must use a fixed backend; older hosts
+do not participate in this lock.
+
+Restoring historical sessions uses the host's V3 migration, which preserves
+the original log. Upgraded sessions cannot be read by older hosts.
+Multi-root workspaces are supported via the bundled multi-root plugin
+(see Sessions under Features).
+
+### A · dsh profile plugin (recommended)
+
+```bash
+npm install -g @deepseek-ai/dsh
+dsh web                                                    # save your API key once
+dsh plugin --profile acp add deepseek-harness-acp-zed@latest
+```
+
+```jsonc
+// Zed settings.json
+{
+  "agent_servers": {
+    "DeepSeek Harness": { "command": "dsh", "args": ["--profile", "acp"] }
+  }
+}
+```
+
+The plugin command creates `$DSH_HOME/profiles/acp`, installs or upgrades the
+adapter, and registers its `dsh.bundle` patch. The bridge mounts over
+`@deepseek-ai/dsh-base` — the same product baseline as `dsh web`, with the
+module-reload watcher off. Extend the profile in
+`$DSH_HOME/profiles/acp/cordis.patch.yml` like any other dsh profile. A global
+`dsh-acp` installation is not required for this path.
+
+### B · Standalone server
+
+```bash
+npm install -g deepseek-harness-acp-zed
+dsh-acp login        # interactive; or save the key in the dsh Web UI
+```
+
+```jsonc
+// Zed settings.json
+{
+  "agent_servers": {
+    "DeepSeek Harness": { "command": "dsh-acp" }
+  }
+}
+```
+
+The standalone binary uses the runtime archived inside this package unless a
+harness is named explicitly via `--dsh-path` / `DSH_PATH` / `DSH_ACP_HOST`.
+DSH is declared as an `engines.dsh` floor (see *DSH compatibility*), never an
+npm-installed dependency: plugin mode uses the
+Host's tree, while standalone maps the same imports to the private runtime.
+When a real `$DSH_HOME/profiles/acp` exists, that profile owns the composition.
+
+## Plugin and extension model
+
+There are two independent ways to extend an ACP-backed surface.
+
+To use portable Agent Plugins, Codex plugins, Claude Code plugins, or Pi
+packages through an ACP client, add the
+[Agent Plugins Bridge](https://github.com/openma-ai/dsh-agents-plugins-bridge) to the
+same profile:
+
+```sh
+dsh plugin --profile acp add @openma/dsh-agents-plugins-bridge@latest
+```
+
+The Bridge contributes ordinary Host rows. Imported commands, skills, tools,
+hooks, MCP connections, agents, and Pi extensions therefore reach ACP through
+this adapter's existing projections; there is no ACP-specific plugin import
+runtime. The Bridge's Web management panel and MCP Apps HTML renderer remain
+Web surfaces and are not sent over ACP.
+
+For extensions that need a session-owned background lifecycle without an open
+terminal UI, use
+[Martty owner](https://github.com/openma-ai/deepseek-harness-tui/blob/main/README.en.md#martty-owner-long-lived-headless-acp--pi-rpc).
+It is a generic ACP `rpc` client: this package remains the server/transport,
+while Martty owns the long-lived Session and explicit startup/shutdown slash
+commands.
+
+### Extend the Host composition
+
+The ACP adapter rides the Cordis tree that the profile already owns. Add dsh
+plugins to that profile to change the agent composition instead of forking the
+ACP server: providers and models join the live catalog, commands and skills
+join the advertised session surface, tools and subagents appear through
+standard `session/update`, and the same session persistence remains available
+to every surface.
+
+For applications embedding ACP, the public package entries are:
+
+| Export | Role |
+|---|---|
+| `deepseek-harness-acp-zed/plugin` | Complete Host-side surface plugin. It fills the ACP-required Host services that Base leaves to a surface and provides `ctx.acpServer`. It does not claim a transport. |
+| `deepseek-harness-acp-zed/server` | Lower-level transport-independent `acpServer` provider for a Host tree that already supplies the injected composition services. |
+| `deepseek-harness-acp-zed/stdio` | Standard profile adapter: connects `ctx.acpServer` to process stdin/stdout. |
+| `deepseek-harness-acp-zed/bridge` | Node stream adapter and compatibility entry for older profile patches. |
+
+`ctx.acpServer.connect(stream)` creates a connection-owned bridge fiber over
+the existing Host composition. The transport owner retains process, stream,
+and TTY lifecycle; the ACP plugin retains session and agent semantics. This is
+the shape used by
+[`@openma/deepseek-harness-tui`](https://github.com/openma-ai/deepseek-harness-tui):
+ACP stays on the Base Host tree while a separate TUI Client process owns its
+own Cordis tree.
+
+Adding a Cordis service does not automatically invent a wire method. Prefer a
+standard ACP capability or event projection whenever one exists; add an
+adapter only for behavior that must cross the client boundary.
+
+### Extend ACP without breaking ordinary clients
+
+Optional wire behavior follows ACP's extension conventions:
+
+1. Advertise support in `initialize` metadata, with a namespaced and versioned
+   capability such as `_meta.dsh.cordis.protocol`.
+2. Carry annotations on standard messages in namespaced `_meta` fields when no
+   new request is needed.
+3. Name custom JSON-RPC requests and notifications with a leading underscore,
+   and send them only after both peers negotiated the matching capability.
+4. Keep the standard ACP path complete. A client that does not advertise an
+   extension must still get normal sessions, prompts, updates, cancellation,
+   auth, and config options.
+
+#### DSH tool result values
+
+The [ACP metadata registry][metadata-registry] is the authoritative list of
+every `_meta` field this adapter reads or emits. It records direction, carrier,
+shape, negotiation requirements, and replay behavior, including native DSH
+tool values at `_meta.dsh.toolResult.value`.
+
+[metadata-registry]: https://github.com/openma-ai/deepseek-harness-acp/blob/main/docs/metadata.md
+
+The current package applies this pattern to the built-in `_dsh/cordis/*`
+family used by the TUI for Client capability discovery, dynamic Package
+lifecycle, and package-private Host/Client RPC. It is an explicit, versioned
+extension—not a synchronization of Cordis plugin ids, fibers, or `inject`
+across processes. The bridge's internal method registry is not currently a
+public arbitrary-extension API; new extension families should first define a
+stable capability, ownership, lifecycle, and fallback contract.
+
+## Authentication
+
+No keys in editor config, no secrets pasted into chat. ACP clients follow
+the protocol: `initialize` advertises the **Agent Auth** methods the client
+declared it can use.
+
+1. **API key** — `api-key`, or `api-key:<provider>` per live route. The
+   client may pass `_meta["api-key"].apiKey`.
+2. **Terminal** — `terminal-login`, when the client declares
+   `clientCapabilities.auth.terminal` (or `_meta["terminal-auth"]`). The
+   client runs the advertised `dsh-acp login` command itself — the adapter
+   never supplies a command path — and the saved key is picked up on the
+   next `authenticate` or `session/new`.
+3. **Browser** — `browser`, only when the client declares
+   `clientCapabilities.elicitation.url`. The adapter starts a localhost
+   sign-in page and hands its URL to the client through url elicitation —
+   headless, SSH, and WSL sessions all see the URL. The secret never
+   travels over ACP; the page's own timeout bounds the wait, and a decline
+   or cancel ends the flow with `auth_required` instead of hanging.
+4. **Custom gateway** — `gateway`, only when the client opts in with
+   `clientCapabilities.auth._meta.gateway === true`. The client sends
+   `_meta.gateway` `{ baseUrl, headers, providerName? }`.
+
+The adapter writes credentials to the harness store. Missing credentials
+fail `session/new` and `session/prompt` with `auth_required` (`-32000`)
+carrying `data.authMethods` — the same advertised list — so the client can
+open its auth UI from any failure. Typing a native auth command
+(`/login`, `/logout`) gets a plain "isn't available in this environment"
+reply pointing at the client's sign-in/sign-out and ends the turn — it is
+never advertised, never reaches the model, never changes credentials, and
+never returns `auth_required`.
+
+`logout` is scoped to one provider route — the one named by
+`_meta.provider`, or the active provider when omitted — and clears only
+that provider's stored key and gateway base-URL. Re-authenticating
+overwrites the same provider's credential; authenticating a second
+provider adds alongside the first; `dsh-acp login --provider <route>`
+replaces it out of band. The active method, provider, and credential name
+are pushed to the client as `_auth/status_update` whenever they change.
+
+1. **Harness credential store** — `$DSH_HOME/.credentials.yaml` (mode 600),
+   the file the dsh Web UI writes; hot-reloaded. Save a key with
+   `dsh-acp login [--provider <route>]`, or the Web UI (Settings → Models).
+2. **Process environment** — `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` (and
+   the matching `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` for those routes) in
+   the environment that launches the agent.
+
+The credential gate is the **current provider route**. An Anthropic-only
+store is enough for an Anthropic session; a DeepSeek key does not unlock
+another provider.
+
+## Features
+
+- **Streaming** — assistant text and reasoning deltas; assembled-message fallback.
+- **Images** — `promptCapabilities.image` is advertised when the composition mounts `ctx.attachments` (dsh-base does). ACP `image` blocks are validated, stored with `saveImage`, and kept in wire order with surrounding text. `resource_link` stays a textual file pointer.
+- **Tool calls** — ACP kinds, human titles, file locations, real diffs from fs-tool hunks, raw input/output; command output on a **display terminal** when the client supports one, fenced output otherwise.
+- **Permission presets as session modes** — `read-only` / `workspace-write` / `danger-full-access`, each a named `{sandbox, approval}` pair recorded as a durable session fact (also exposed as a config option for clients that only render those).
+- **Agent composition** — when the profile mounts `agentPresets`, an uncategorized config option `id: "agent"` lists the roster (`standard` / `code` / `minimal` / `cordis`, plus user copies). Switching rebuilds the agent live with history preserved. Authoring (copy/rm) stays on the Web settings page; there is no `/preset` slash.
+- **Live model catalog** — providers × models from the running composition (third-party providers added in the Web UI appear immediately), plus reasoning-effort selection that follows your product default. Model option ids are stable: bare model ids while one provider is registered, `provider::model` as soon as there are several — never keyed on the *current default* provider (which every switch rewrites), so an id a client cached keeps working. Bare ids are still accepted on input and resolve to the provider that serves them.
+- **Slash commands** — adapter built-ins (`/status`, `/model`) plus the harness command registry (`/compact`, `/goal`, `/permission`, `/plan`, …) executed without a model turn, plus **skills** (`/skill-name` — the harness's own invocation gesture). Login and logout are ACP methods, not chat commands.
+- **Plans & usage** — `todo_write` snapshots as ACP plans; token accounting as `usage_update` and per-turn usage.
+- **Sessions** — `session/resume` restores a durable session without replaying its transcript; `session/load` remains the full-history path. Also supports `session/list`, silent restore when a client prompts an old session after an agent restart, and titles as `session_info_update`. **Multi-root sessions** are supported through the bundled multi-root plugin: `initialize` advertises `sessionCapabilities.additionalDirectories: {}`, and `session/new`, `session/load`, `session/resume`, and `session/fork` accept absolute directory paths (`cwd` stays the base for relative paths). Additional roots are readable in every mode and writable under `workspace-write` (not under `read-only`); omitted or empty input on `session/new` is exactly the single-root path. The list is persisted as a session plugin record: `load`/`resume`/`fork` restore it when the client omits `additionalDirectories`, while a non-empty request replaces it. The plugin replaces the core `fs-sandbox`/`sandbox` rows with thin in-tree subclasses and widens bwrap/Landlock/Seatbelt profiles; a profile shape it cannot widen fails closed rather than silently dropping the roots. Residual limits: the Windows ACL backend cannot widen its singular workspace grant (additional-root writes are unsupported there, though reads still work), Windows UNC/device paths are refused, and widening is coupled to the profile shapes emitted by `@deepseek-ai/dsh-sandbox-local`.
+- **Fork** — `initialize` advertises `sessionCapabilities.fork: {}` and `agentCapabilities._meta.jetbrains.air.fork = { version: 1, inclusive: true }` (deep-merged next to `dsh.cordis`). `session/fork` creates a new session id and leaves the source session unchanged. Without `_meta.jetbrains.air.fork`, the new session copies the source's committed log. With that block, the copy keeps the selected assistant message and everything before it, and drops every later message. `messageId` is the ACP id `<turn>:<step>` (a `<id>:segment:<n>` id is also matched as `<id>`). An optional `messageFingerprint` (`sha256:` + SHA-256 of the assistant text) and 1-based `messageOccurrence` disambiguate. A bad version, a bad fingerprint, a missing id, or a point that is not in the log is JSON-RPC `-32602` — the adapter does not silently copy the whole session. Unknown session ids and subagent child sessions are also `-32602`. Only persisted assistant messages are fork points; a running turn's live stream is ignored. If the selected message itself contains tool calls, those calls are removed from the copied message (their results are stored after the message, so keeping the calls would leave an illegal transcript and would make `session/load` replay continue past the message). Tool calls and results from earlier messages stay. `session/load` on the new session replays through that assistant message and no further; `session/prompt` continues from there. The fork response carries the same `modes` and `configOptions` shape as `session/new`.
+- **MCP servers** — per-session `mcpServers` mount `@deepseek-ai/dsh-mcp-client` instances (stdio + streamable HTTP); tools join as `mcp__<server>__<tool>`; a failing server never takes the session down.
+- **Steering** — the initialize response advertises `_meta.steering.supported: true`. Send `_session/steering` with `{ sessionId, prompt, _meta: { steering: { idleBehavior: "promptRequired" } } }` to inject into an active turn; `{ outcome: "injected" }` leaves its original prompt request and output stream in charge. If that turn ends before injection, the response is `{ outcome: "promptRequired", reason: "noRunningTurn" }` and the client sends an ordinary `session/prompt`. Omitting `idleBehavior` uses the same behavior. Concurrent `session/prompt` steering remains supported.
+- **Real cancellation** — `session/cancel` interrupts the live turn through the harness agent.
+
+## Configuration
+
+Flags win over environment variables, which win over defaults. All optional —
+with no flags, sessions follow your product defaults (`settings.yaml`).
+
+| Flag | Env | Default | Purpose |
+|---|---|---|---|
+| `--dsh-path` | `DSH_PATH` | auto-detect | DeepSeek Harness installation |
+| `--provider` | `DSH_PROVIDER` | product default | Provider route override |
+| `--model` | `DSH_MODEL` | product default | Model override |
+| `--max-tokens` | `DSH_MAX_TOKENS` | provider default | Per-request output-token cap |
+| `--permission-mode` | `DSH_PERMISSION_MODE` | `workspace-write` | Initial permission preset |
+| `--reasoning-effort` | `DSH_REASONING_EFFORT` | product default | `off` / `high` / `max` |
+| — | `DEEPSEEK_API_KEY` | — | API credential (fallback to the credential store) |
+| — | `DEEPSEEK_BASE_URL` | DeepSeek endpoint | OpenAI-compatible endpoint override |
+| — | `DSH_ACP_DEBUG` | off | Verbose stderr diagnostics |
+
+Subcommands: `dsh-acp login [api-key]` (interactive when omitted; input never
+echoes), `dsh-acp update` (self-update via npm).
+
+## Permissions and sandboxing
+
+Sessions start in `workspace-write`: bash and file mutations are confined to
+the session's `cwd` (plus shared temp roots), and a model retry requesting
+wider access raises an ACP permission request. **Always allow (this
+session)** flips the approval policy to `never` for that session.
+`danger-full-access` disables both the sandbox and the prompts — use it only
+in disposable checkouts or containers. Each level is one durable preset
+(sandbox + approval together), the same three the Web UI offers.
+
+## Architecture
+
+```
+ACP client (Zed, …)
+   │  ACP JSON-RPC over stdio
+   ▼
+dsh-acp
+   ├─ src/bin.ts              selects one DSH tree before Host imports evaluate
+   ├─ src/profile-boot.ts     boots the harness's own profile machinery
+   │                          (dsh-base + this bundle + $DSH_HOME layers)
+   ├─ src/harness.ts          host discovery (DSH_PATH → cwd → PATH → npm -g → bundled runtime)
+   └─ src/bridge/             the ACP bridge (a cordis plugin)
+        ├─ index.ts           sessions, prompts, cancel, modes, options,
+        │                     commands, credentials, MCP mounts
+        ├─ translate.ts       session-event → ACP update projection (pure)
+        ├─ history.ts         stored-log replay for session/load (pure)
+        ├─ fork.ts            session/fork meta, message lookup, inclusive cut (pure)
+        └─ prompt.ts          ACP prompt blocks → harness content blocks (pure)
+   ▼
+external or package-bundled dsh     (agent spine, llm, persistence, sandbox,
+                                     tools, presets, skills, compaction, …)
+```
+
+When embedded by another surface, only the transport edge changes:
+
+```text
+dsh Base Host Cordis tree
+   ├─ product plugins (agents, tools, skills, persistence, …)
+   └─ deepseek-harness-acp-zed/plugin
+         └─ acpServer.connect(Stream)
+                │ standard ACP + negotiated extensions
+                ▼
+          surface-owned Client process
+```
+
+The bridge consumes the harness `session/event` firehose — the same
+append-only log persistence stores — so live streaming, history replay, and
+`session/list` agree by construction. All harness modules, including cordis
+itself, load from one host tree: plugin and service identity is never split
+across copies.
+
+## Development
+
+```bash
+npm install         # dev deps include the harness packages (types + tests)
+npm run typecheck   # tsc --noEmit
+npm test            # vitest: unit + e2e smoke (boots the real composition; no model calls)
+npm run build       # esbuild → dist/
+```
+
+To also run the e2e suite against a standalone host install:
+
+```bash
+npm install --prefix /tmp/dsh-host @deepseek-ai/dsh
+DSH_ACP_TEST_HOST=/tmp/dsh-host npm test
+```
+
+### Live iteration: paired profiles
+
+Keep the profile your editor uses on the published package, and point a
+second profile at this worktree via a pnpm symlink:
+
+```bash
+dsh plugin --profile acp add -w deepseek-harness-acp-zed   # stable
+dsh plugin --profile acp-test add -w "link:$PWD"               # dev (symlink)
+```
+
+The dev loop is `npm run build` + restart — `dist/` and `cordis.patch.yml`
+are read through the link. (pnpm treats `file:` as a copy install and caches
+same-version tarballs; `link:` avoids both.)
+
+```jsonc
+{
+  "agent_servers": {
+    "DeepSeek Harness": { "command": "dsh", "args": ["--profile", "acp"] },
+    "DeepSeek Harness (dev)": { "command": "dsh", "args": ["--profile", "acp-test"] }
+  }
+}
+```
+
+### Automated compatibility review
+
+When `.github/workflows/dsh-update.yml` opens a new bundled-dsh upgrade PR, it automatically dispatches a Cursor cloud agent to review ACP compatibility with the new dsh version. The agent:
+
+- Reads dsh release notes and API changes between versions
+- Tests the ACP adapter with the new dsh version
+- Pushes fixes directly to the PR branch if needed
+- Posts a verdict comment on the PR (safe to merge / safe after fixes / not safe)
+
+This requires the `CURSOR_API_KEY` organization or repository secret (a Cursor API key from the Cursor Dashboard). If the secret is not configured, the workflow skips the agent dispatch with a warning and leaves the PR open for manual review.
+
+The agent uses the [Cursor Cloud Agents API v1](https://cursor.com/docs/cloud-agent/api/endpoints) with `workOnCurrentBranch: true` to push directly to the PR's head branch without creating a new branch or PR.
+
+To manually test the review workflow on an existing PR, trigger the workflow via Actions → Update bundled dsh → Run workflow and provide the PR number. The dispatch logic lives in `scripts/dispatch-cursor-review.sh`.
+
+## License
+
+Apache-2.0.
