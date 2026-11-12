@@ -1,7 +1,7 @@
 # ACP `_meta` registry
 
 This file is the source of truth for every `_meta` field read or emitted by
-`@openma/deepseek-harness-acp`. It documents adapter-owned DSH extensions and
+`deepseek-harness-acp-zed`. It documents adapter-owned DSH extensions and
 the compatibility extensions the adapter implements for existing ACP clients.
 Standard ACP fields remain sufficient unless a client explicitly opts into one
 of the capabilities below.

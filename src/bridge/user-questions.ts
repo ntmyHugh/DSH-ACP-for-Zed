@@ -263,7 +263,7 @@ interface AcpUserQuestionRouter {
     disposeProvider: () => void;
 }
 
-const ROUTERS_KEY = Symbol.for("@openma/deepseek-harness-acp/user-question-routers");
+const ROUTERS_KEY = Symbol.for("deepseek-harness-acp-zed/user-question-routers");
 const routers = ((globalThis as Record<PropertyKey, unknown>)[ROUTERS_KEY] ??=
     new WeakMap<object, AcpUserQuestionRouter>()) as WeakMap<object, AcpUserQuestionRouter>;
 

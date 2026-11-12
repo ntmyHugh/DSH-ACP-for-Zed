@@ -8,7 +8,7 @@ describe("standalone native packages", () => {
     it("copies the platform package installed by npm into the isolated runtime", () => {
         const root = mkdtempSync(join(tmpdir(), "acp-native-test-"));
         try {
-            const packageRoot = join(root, "node_modules/@openma/deepseek-harness-acp");
+            const packageRoot = join(root, "node_modules/deepseek-harness-acp-zed");
             const native = join(root, "node_modules/sherpa-onnx-linux-x64");
             const runtime = join(root, "runtime");
             mkdirSync(packageRoot, { recursive: true });

@@ -1,4 +1,4 @@
-# @openma/deepseek-harness-acp bundle patch: mounts the ACP stdio bridge over
+# deepseek-harness-acp-zed bundle patch: mounts the ACP stdio bridge over
 # the profile's base bundle. Stdout carries ACP JSON-RPC exclusively, so the
 # module-reload HMR row stays off (its watcher is unnecessary for a
 # client-owned server process); dsh-base mounts no stdout logger.
@@ -7,7 +7,7 @@
 # credentials, persistence (the shared $DSH_HOME/sessions store), sandbox,
 # tools, skills, subagents — and exposes it to ACP clients such as Zed:
 #
-#     dsh plugin --profile acp add -w @openma/deepseek-harness-acp
+#     dsh plugin --profile acp add -w deepseek-harness-acp-zed
 #     dsh --profile acp
 #
 # No provider/model is pinned here: sessions inherit the composition default
@@ -45,13 +45,13 @@
     # Per-session additional roots fed by the ACP bridge (session/new, load,
     # resume, fork). The fs and sandbox providers inject this service.
     - id: acp-multi-root
-      name: '@openma/deepseek-harness-acp/multi-root'
+      name: 'deepseek-harness-acp-zed/multi-root'
 
     - id: acp-multi-root-fs
-      name: '@openma/deepseek-harness-acp/multi-root/fs'
+      name: 'deepseek-harness-acp-zed/multi-root/fs'
 
     - id: acp-multi-root-sandbox
-      name: '@openma/deepseek-harness-acp/multi-root/sandbox'
+      name: 'deepseek-harness-acp-zed/multi-root/sandbox'
 
 # Model-facing tool rows move off the host plane and into each agent preset's
 # own composition (standard/code/minimal/cordis ship complete agent.cordis.yml
@@ -141,7 +141,7 @@
     # The host-service rows above close this profile without borrowing another
     # profile or relying on a development node_modules tree.
     - id: acp-plugin
-      name: '@openma/deepseek-harness-acp/plugin'
+      name: 'deepseek-harness-acp-zed/plugin'
       config:
         model: !!js process.env.DSH_MODEL
         permissionMode: !!js process.env.DSH_PERMISSION_MODE
@@ -149,4 +149,4 @@
     # The ordinary ACP profile owns stdio. Embedded surfaces replace only this
     # adapter and reuse the exact same plugin contract above.
     - id: acp-bridge
-      name: '@openma/deepseek-harness-acp/stdio'
+      name: 'deepseek-harness-acp-zed/stdio'

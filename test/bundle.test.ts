@@ -9,7 +9,7 @@ const bundle = await import('../src/bundle.ts')
 describe('profile bridge transport', () => {
     it('publishes the reusable server as a package plugin entry', () => {
         const require = createRequire(import.meta.url)
-        expect(require.resolve('@openma/deepseek-harness-acp/server'))
+        expect(require.resolve('deepseek-harness-acp-zed/server'))
             .toBe(join(import.meta.dirname, '../dist/server.js'))
     })
 
@@ -31,11 +31,11 @@ describe('profile bridge transport', () => {
         })
         expect(server).toMatchObject({
             id: 'acp-plugin',
-            name: '@openma/deepseek-harness-acp/plugin',
+            name: 'deepseek-harness-acp-zed/plugin',
         })
         expect(stdio).toMatchObject({
             id: 'acp-bridge',
-            name: '@openma/deepseek-harness-acp/stdio',
+            name: 'deepseek-harness-acp-zed/stdio',
         })
         expect(rows.indexOf(hostRunner as never)).toBeLessThan(rows.indexOf(server as never))
         expect(rows.indexOf(server as never)).toBeLessThan(rows.indexOf(stdio as never))

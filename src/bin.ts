@@ -7,7 +7,7 @@ import { logError } from "./log.ts";
 import { explicitDshPath, HELP_TEXT } from "./settings.ts";
 import { VERSION } from "./version.ts";
 
-const NAME = "@openma/deepseek-harness-acp";
+const NAME = "deepseek-harness-acp-zed";
 
 async function bootstrap(): Promise<void> {
     const argv = process.argv.slice(2);

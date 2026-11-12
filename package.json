@@ -1,5 +1,5 @@
 {
-  "name": "@openma/deepseek-harness-acp",
+  "name": "deepseek-harness-acp-zed",
   "publishConfig": {
     "access": "public"
   },

@@ -108,7 +108,7 @@ describe("CLI dispatch", () => {
     it("prints the version and exits before resolving a host", async () => {
         const log = vi.spyOn(console, "log").mockImplementation(() => {});
         await main(["--version"]);
-        expect(log).toHaveBeenCalledWith(`@openma/deepseek-harness-acp ${VERSION}`);
+        expect(log).toHaveBeenCalledWith(`deepseek-harness-acp-zed ${VERSION}`);
         expect(resolveHost).not.toHaveBeenCalled();
     });
 

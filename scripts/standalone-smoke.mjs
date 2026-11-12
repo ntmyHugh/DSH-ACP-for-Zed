@@ -47,7 +47,7 @@ try {
     ], {
         stdio: "inherit", timeout: 180_000, shell: process.platform === "win32" && !useNodeCli,
     });
-    const binary = join(root, "node_modules/@openma/deepseek-harness-acp/dist/bin.js");
+    const binary = join(root, "node_modules/deepseek-harness-acp-zed/dist/bin.js");
     const env = { ...process.env };
     for (const key of Object.keys(env)) {
         if (/^(DSH_|DEEPSEEK_|NODE_|PATH$)/i.test(key)) delete env[key];
@@ -117,7 +117,7 @@ try {
     // A fresh cache must have been populated: an external host cannot satisfy this test.
     const runtimes = readdirSync(cache).filter((name) => !name.startsWith("."));
     assert.equal(runtimes.length, 1);
-    const metadata = JSON.parse(readFileSync(join(root, "node_modules/@openma/deepseek-harness-acp/vendor/runtime.json")));
+    const metadata = JSON.parse(readFileSync(join(root, "node_modules/deepseek-harness-acp-zed/vendor/runtime.json")));
     assert.equal(readFileSync(join(cache, runtimes[0], ".dsh-acp-runtime"), "utf8").trim(), metadata.dsh);
     const officePackage = process.platform === "linux"
         ? "@deepseek-ai/libreoffice-kit-wasm"

@@ -12,8 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@openma/deepseek-harness-acp"><img src="https://img.shields.io/npm/v/%40openma%2Fdeepseek-harness-acp?logo=npm&color=cb3837" alt="npm version" /></a>
-  <a href="https://www.npmjs.com/package/@openma/deepseek-harness-acp"><img src="https://img.shields.io/npm/dm/%40openma%2Fdeepseek-harness-acp" alt="npm downloads" /></a>
+  <a href="https://www.npmjs.com/package/deepseek-harness-acp-zed"><img src="https://img.shields.io/npm/v/%40openma%2Fdeepseek-harness-acp?logo=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/deepseek-harness-acp-zed"><img src="https://img.shields.io/npm/dm/%40openma%2Fdeepseek-harness-acp" alt="npm downloads" /></a>
   <a href="https://github.com/openma-ai/deepseek-harness-acp/actions/workflows/ci.yml"><img src="https://github.com/openma-ai/deepseek-harness-acp/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://agentclientprotocol.com/"><img src="https://img.shields.io/badge/ACP-protocol%20v1-6f42c1" alt="ACP protocol v1" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -34,7 +34,7 @@ touch your editor config — it reuses the key you saved in the dsh Web UI, or
 | | **A · dsh profile plugin (recommended)** | **B · Standalone server** |
 |---|---|---|
 | Best for | Normal installation and upgrades | Connecting an ACP client without managing a dsh profile |
-| Install | `dsh plugin --profile acp add @openma/deepseek-harness-acp@latest` | `npm i -g @openma/deepseek-harness-acp` |
+| Install | `dsh plugin --profile acp add deepseek-harness-acp-zed@latest` | `npm i -g deepseek-harness-acp-zed` |
 | Zed runs | `dsh --profile acp` | `dsh-acp` |
 | Harness | The dsh that owns the profile | Your installed dsh, then the package's locked private runtime |
 | Composition | dsh-base + this bundle + your profile's own patches | dsh-base + this bundle (profile machinery booted in-process) |
@@ -44,7 +44,7 @@ and session logs as `dsh web` — conversations started in the Web UI can be
 listed and loaded from the editor.
 
 Other dsh surfaces can mount the transport-independent
-`@openma/deepseek-harness-acp/plugin` on their Base Host tree and own the
+`deepseek-harness-acp-zed/plugin` on their Base Host tree and own the
 transport adapter. The TUI profile uses this path: it starts a separate TUI
 Client process and connects ACP over that process's standard stdin/stdout; it
 does not start `dsh-acp` or use an in-process Client stream.
@@ -101,7 +101,7 @@ Multi-root workspaces are supported via the bundled multi-root plugin
 ```bash
 npm install -g @deepseek-ai/dsh
 dsh web                                                    # save your API key once
-dsh plugin --profile acp add @openma/deepseek-harness-acp@latest
+dsh plugin --profile acp add deepseek-harness-acp-zed@latest
 ```
 
 ```jsonc
@@ -123,7 +123,7 @@ module-reload watcher off. Extend the profile in
 ### B · Standalone server
 
 ```bash
-npm install -g @openma/deepseek-harness-acp
+npm install -g deepseek-harness-acp-zed
 dsh-acp login        # interactive; or save the key in the dsh Web UI
 ```
 
@@ -182,10 +182,10 @@ For applications embedding ACP, the public package entries are:
 
 | Export | Role |
 |---|---|
-| `@openma/deepseek-harness-acp/plugin` | Complete Host-side surface plugin. It fills the ACP-required Host services that Base leaves to a surface and provides `ctx.acpServer`. It does not claim a transport. |
-| `@openma/deepseek-harness-acp/server` | Lower-level transport-independent `acpServer` provider for a Host tree that already supplies the injected composition services. |
-| `@openma/deepseek-harness-acp/stdio` | Standard profile adapter: connects `ctx.acpServer` to process stdin/stdout. |
-| `@openma/deepseek-harness-acp/bridge` | Node stream adapter and compatibility entry for older profile patches. |
+| `deepseek-harness-acp-zed/plugin` | Complete Host-side surface plugin. It fills the ACP-required Host services that Base leaves to a surface and provides `ctx.acpServer`. It does not claim a transport. |
+| `deepseek-harness-acp-zed/server` | Lower-level transport-independent `acpServer` provider for a Host tree that already supplies the injected composition services. |
+| `deepseek-harness-acp-zed/stdio` | Standard profile adapter: connects `ctx.acpServer` to process stdin/stdout. |
+| `deepseek-harness-acp-zed/bridge` | Node stream adapter and compatibility entry for older profile patches. |
 
 `ctx.acpServer.connect(stream)` creates a connection-owned bridge fiber over
 the existing Host composition. The transport owner retains process, stream,
@@ -355,7 +355,7 @@ When embedded by another surface, only the transport edge changes:
 ```text
 dsh Base Host Cordis tree
    ├─ product plugins (agents, tools, skills, persistence, …)
-   └─ @openma/deepseek-harness-acp/plugin
+   └─ deepseek-harness-acp-zed/plugin
          └─ acpServer.connect(Stream)
                 │ standard ACP + negotiated extensions
                 ▼
@@ -390,7 +390,7 @@ Keep the profile your editor uses on the published package, and point a
 second profile at this worktree via a pnpm symlink:
 
 ```bash
-dsh plugin --profile acp add -w @openma/deepseek-harness-acp   # stable
+dsh plugin --profile acp add -w deepseek-harness-acp-zed   # stable
 dsh plugin --profile acp-test add -w "link:$PWD"               # dev (symlink)
 ```
 

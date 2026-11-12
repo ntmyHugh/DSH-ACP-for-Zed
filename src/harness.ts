@@ -74,7 +74,7 @@ export class HarnessNotFoundError extends Error {
                       "could not find a usable DeepSeek Harness runtime.",
                       "",
                       "The bundled DeepSeek Harness runtime is missing or invalid.",
-                      "Reinstall @openma/deepseek-harness-acp, or point it at an existing installation:",
+                      "Reinstall deepseek-harness-acp-zed, or point it at an existing installation:",
                       "    DSH_PATH=/path/to/dsh dsh-acp        (dsh binary, package dir, or npm root)",
                       "",
                       probed.length > 0

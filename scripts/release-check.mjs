@@ -1,5 +1,5 @@
 /**
- * Release gate for @openma/deepseek-harness-acp.
+ * Release gate for deepseek-harness-acp-zed.
  *
  * Version commits stay `release: vX.Y.Z` on main and only need package.json
  * plus package-lock.json. This repo has no changelog: `release.yml` publishes

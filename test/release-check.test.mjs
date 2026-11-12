@@ -55,10 +55,10 @@ describe("release check parsing", () => {
     });
 
     it("pins only this package's version and ignores @latest and the bundled DSH version", () => {
-        const readme = "The bundled runtime is DSH `0.1.5-rc.1`.\n\ndsh plugin add @openma/deepseek-harness-acp@latest\n";
+        const readme = "The bundled runtime is DSH `0.1.5-rc.1`.\n\ndsh plugin add deepseek-harness-acp-zed@latest\n";
         expect(readmePinErrors(readme, "0.4.36")).toEqual([]);
-        expect(readmePinErrors(`${readme}@openma/deepseek-harness-acp@0.4.35\n`, "0.4.36")).toEqual([
-            "README.md pins @openma/deepseek-harness-acp@0.4.35, expected version 0.4.36",
+        expect(readmePinErrors(`${readme}deepseek-harness-acp-zed@0.4.35\n`, "0.4.36")).toEqual([
+            "README.md pins deepseek-harness-acp-zed@0.4.35, expected version 0.4.36",
         ]);
         expect(readmePinErrors("github:openma-ai/deepseek-harness-acp#v0.4.36\n", "0.4.36")).toEqual([]);
         expect(githubRepository("git@github.com:openma-ai/deepseek-harness-acp.git")).toBe("openma-ai/deepseek-harness-acp");
@@ -164,7 +164,7 @@ describe("release check on a pull request", () => {
         release(cwd, "0.4.36", undefined, readme("0.4.35"));
         const result = run(cwd, { RELEASE_LABELS: "" });
         expect(result.code).toBe(1);
-        expect(result.stderr).toContain("README.md pins @openma/deepseek-harness-acp@0.4.35, expected version 0.4.36");
+        expect(result.stderr).toContain("README.md pins deepseek-harness-acp-zed@0.4.35, expected version 0.4.36");
 
         const unpinned = releasedRepo("0.4.35");
         release(unpinned, "0.4.36", undefined, readme());
@@ -403,23 +403,23 @@ function release(cwd, version, lock, readmeText = readme()) {
 function writePackage(cwd, version, lock = { root: version, nested: version }) {
     writeFileSync(
         join(cwd, "package.json"),
-        `${JSON.stringify({ name: "@openma/deepseek-harness-acp", version }, null, 2)}\n`,
+        `${JSON.stringify({ name: "deepseek-harness-acp-zed", version }, null, 2)}\n`,
     );
     writeFileSync(
         join(cwd, "package-lock.json"),
         `${JSON.stringify({
-            name: "@openma/deepseek-harness-acp",
+            name: "deepseek-harness-acp-zed",
             version: lock.root,
             lockfileVersion: 3,
-            packages: { "": { name: "@openma/deepseek-harness-acp", version: lock.nested } },
+            packages: { "": { name: "deepseek-harness-acp-zed", version: lock.nested } },
         }, null, 2)}\n`,
     );
 }
 
 function readme(pin) {
     const install = pin
-        ? `dsh plugin --profile acp add @openma/deepseek-harness-acp@${pin}`
-        : "dsh plugin --profile acp add @openma/deepseek-harness-acp@latest";
+        ? `dsh plugin --profile acp add deepseek-harness-acp-zed@${pin}`
+        : "dsh plugin --profile acp add deepseek-harness-acp-zed@latest";
     return `The bundled runtime is DSH \`0.1.5-rc.1\`.\n\n${install}\n`;
 }
 

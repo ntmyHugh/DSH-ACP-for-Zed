@@ -1,7 +1,7 @@
 /**
  * Bundle entry: bind the reusable ACP server to process stdio.
  *
- * This is what `@openma/deepseek-harness-acp/bridge` resolves to when the
+ * This is what `deepseek-harness-acp-zed/bridge` resolves to when the
  * package is installed into a dsh profile (`dsh plugin --profile acp add …`)
  * and named by the bundle patch. In a profile, the surrounding dsh
  * installation provides every `@deepseek-ai/*` module, so — unlike the

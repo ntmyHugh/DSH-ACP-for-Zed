@@ -70,13 +70,13 @@ function ownRoot(): string {
     return dirname(createRequire(import.meta.url).resolve("../package.json"));
 }
 
-const OWN_BRIDGE_SPECIFIER = "@openma/deepseek-harness-acp/bridge";
-const OWN_SERVER_SPECIFIER = "@openma/deepseek-harness-acp/server";
-const OWN_PLUGIN_SPECIFIER = "@openma/deepseek-harness-acp/plugin";
-const OWN_STDIO_SPECIFIER = "@openma/deepseek-harness-acp/stdio";
-const OWN_MULTI_ROOT_SPECIFIER = "@openma/deepseek-harness-acp/multi-root";
-const OWN_MULTI_ROOT_FS_SPECIFIER = "@openma/deepseek-harness-acp/multi-root/fs";
-const OWN_MULTI_ROOT_SANDBOX_SPECIFIER = "@openma/deepseek-harness-acp/multi-root/sandbox";
+const OWN_BRIDGE_SPECIFIER = "deepseek-harness-acp-zed/bridge";
+const OWN_SERVER_SPECIFIER = "deepseek-harness-acp-zed/server";
+const OWN_PLUGIN_SPECIFIER = "deepseek-harness-acp-zed/plugin";
+const OWN_STDIO_SPECIFIER = "deepseek-harness-acp-zed/stdio";
+const OWN_MULTI_ROOT_SPECIFIER = "deepseek-harness-acp-zed/multi-root";
+const OWN_MULTI_ROOT_FS_SPECIFIER = "deepseek-harness-acp-zed/multi-root/fs";
+const OWN_MULTI_ROOT_SANDBOX_SPECIFIER = "deepseek-harness-acp-zed/multi-root/sandbox";
 
 /** Rewrite this package's rows (incl. nested inserts) to absolute entries. */
 function rewriteOwnRows(

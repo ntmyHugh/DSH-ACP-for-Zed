@@ -4,9 +4,9 @@
  *
  * The provider rows live in sibling entries so the profile patch can mount
  * them as separate Cordis plugins:
- *  - `@openma/deepseek-harness-acp/multi-root`        (this scope)
- *  - `@openma/deepseek-harness-acp/multi-root/fs`     (filesystem fence)
- *  - `@openma/deepseek-harness-acp/multi-root/sandbox` (kernel sandbox)
+ *  - `deepseek-harness-acp-zed/multi-root`        (this scope)
+ *  - `deepseek-harness-acp-zed/multi-root/fs`     (filesystem fence)
+ *  - `deepseek-harness-acp-zed/multi-root/sandbox` (kernel sandbox)
  *
  * @module dsh-acp/multi-root
  */

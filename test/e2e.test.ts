@@ -648,7 +648,7 @@ describe("dsh-acp Host-owned defaults", () => {
             JSON.stringify({
                 name: "stale-acp-profile",
                 private: true,
-                dependencies: { "@openma/deepseek-harness-acp": "0.0.1" },
+                dependencies: { "deepseek-harness-acp-zed": "0.0.1" },
                 dsh: { profile: { bundles: ["definitely-missing-stale-acp-bundle"] } },
             }),
         );

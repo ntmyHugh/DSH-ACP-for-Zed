@@ -17,7 +17,7 @@ import { logError, logInfo } from "./log.ts";
 import { explicitDshPath, HELP_TEXT, resolveSettings, SettingsError } from "./settings.ts";
 import { VERSION } from "./version.ts";
 
-const NAME = "@openma/deepseek-harness-acp";
+const NAME = "deepseek-harness-acp-zed";
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     if (argv.includes("--version")) {

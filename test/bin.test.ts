@@ -55,7 +55,7 @@ describe("bootstrap", () => {
         process.argv = argvFor("--version");
         const { ready } = await import("../src/bin.ts");
         await ready;
-        expect(log).toHaveBeenCalledWith(`@openma/deepseek-harness-acp ${VERSION}`);
+        expect(log).toHaveBeenCalledWith(`deepseek-harness-acp-zed ${VERSION}`);
         expect(resolveHost).not.toHaveBeenCalled();
         expect(main).not.toHaveBeenCalled();
     });
