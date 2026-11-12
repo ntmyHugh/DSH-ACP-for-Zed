@@ -38,7 +38,7 @@
     "assets/icon.svg"
   ],
   "scripts": {
-    "prepack": "npm run build && npm run runtime:pack",
+    "prepack": "node build.mjs",
     "build": "node build.mjs",
     "runtime:pack": "node scripts/pack-runtime.mjs",
     "start": "node --import tsx src/index.ts",
