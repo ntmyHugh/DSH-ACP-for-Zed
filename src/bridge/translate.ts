@@ -572,6 +572,12 @@ export class SessionProjection {
     private toolCallBlocks = new Map<string, string>();
     private window: PromptWindow = emptyWindow();
     private lastContextUse: number | undefined;
+    /** Characters of reasoning already forwarded in preview mode, per message. */
+    private thoughtPreviewLength = new Map<string, number>();
+    /** Latest durable DSH goal (`goal/change`), surfaced as an ACP plan. */
+    private goalSnapshot: Record<string, unknown> | null = null;
+    /** Latest `todo/write` plan, merged with the goal entry. */
+    private todoPlan: PlanEntry[] = [];
     /** Client renders `_meta.terminal_output` display terminals (Zed extension). */
     private readonly terminalOutput: boolean;
     /** Session working directory, advertised on display terminals. */
@@ -709,6 +715,56 @@ export class SessionProjection {
         return this.onChunk({ turn: located.turn, step: located.step, chunk: frame.chunk });
     }
 
+    /** Goal entries the client should keep visible above the todo list. */
+    private goalPlan(): PlanEntry[] {
+        const goal = this.goalSnapshot;
+        if (goal === null) return [];
+        const phase = asString(goal["phase"]) ?? "";
+        const status: PlanEntry["status"] =
+            phase === "completed" ? "completed" : phase === "paused" || phase === "blocked" ? "pending" : "in_progress";
+        const entries: PlanEntry[] = [
+            { content: `Goal: ${String(goal["objective"] ?? "")}`, status, priority: "high" },
+        ];
+        const roundsStarted = goal["roundsStarted"];
+        const maxRounds = goal["maxGoalRounds"];
+        if (roundsStarted !== undefined || maxRounds !== undefined) {
+            entries.push({
+                content: `Round ${String(roundsStarted ?? 0)}/${String(maxRounds ?? "?")}`,
+                status: "pending",
+                priority: "low",
+            });
+        }
+        const blocked = goal["blockedReason"];
+        if (blocked !== undefined && blocked !== null) {
+            entries.push({ content: `Blocked: ${String(blocked)}`, status: "pending", priority: "high" });
+        }
+        return entries;
+    }
+
+    /** Goal entry (when present) followed by the latest todo list. */
+    private mergedPlan(): PlanEntry[] {
+        return [...this.goalPlan(), ...this.todoPlan];
+    }
+
+    /**
+     * Reasoning text to forward: the full text in `DSH_ACP_SHOW_THOUGHTS=1`
+     * mode, a bounded preview under `DSH_ACP_THOUGHT_PREVIEW=<chars>`, and
+     * nothing otherwise.
+     */
+    private thoughtUpdates(messageId: string, text: string): SessionUpdate[] {
+        if (process.env["DSH_ACP_SHOW_THOUGHTS"] === "1") {
+            return [{ sessionUpdate: "agent_thought_chunk", content: { type: "text", text }, messageId }];
+        }
+        const limit = Number(process.env["DSH_ACP_THOUGHT_PREVIEW"] ?? 0);
+        if (!Number.isFinite(limit) || limit <= 0) return [];
+        const used = this.thoughtPreviewLength.get(messageId) ?? 0;
+        if (used >= limit) return [];
+        const slice = text.slice(0, limit - used);
+        this.thoughtPreviewLength.set(messageId, used + slice.length);
+        if (slice.length === 0) return [];
+        return [{ sessionUpdate: "agent_thought_chunk", content: { type: "text", text: slice }, messageId }];
+    }
+
     /** Project one event before optional subagent attribution is attached. */
     private projectEvent(event: HarnessEvent): SessionUpdate[] {
         const data = event.data ?? {};
@@ -731,7 +787,31 @@ export class SessionProjection {
                 return this.onSubagentEnd(data);
             case "todo/write": {
                 const entries = planEntries(data);
-                return entries !== undefined ? [{ sessionUpdate: "plan", entries }] : [];
+                if (entries === undefined) return [];
+                this.todoPlan = entries;
+                return [{ sessionUpdate: "plan", entries: this.mergedPlan() }];
+            }
+            case "goal/change": {
+                // DSH persists one long-running goal per session as a
+                // versioned `goal/change` event. Surface it through the ACP
+                // plan channel so clients show it next to the todo list.
+                const operation = asString(data["operation"]);
+                if (operation === "clear") {
+                    this.goalSnapshot = null;
+                } else {
+                    const goal = data["goal"];
+                    if (goal !== null && typeof goal === "object") {
+                        const rounds = data["roundsStarted"];
+                        this.goalSnapshot = {
+                            ...(goal as Record<string, unknown>),
+                            roundsStarted:
+                                typeof rounds === "number"
+                                    ? rounds
+                                    : (goal as Record<string, unknown>)["roundsStarted"],
+                        };
+                    }
+                }
+                return [{ sessionUpdate: "plan", entries: this.mergedPlan() }];
             }
             case "user/message": {
                 const source = data["source"];
@@ -859,7 +939,7 @@ export class SessionProjection {
         }
         if (c["type"] === "reasoning-delta") {
             this.streamedReasoning.add(messageId);
-            return [{ sessionUpdate: "agent_thought_chunk", content: { type: "text", text }, messageId }];
+            return this.thoughtUpdates(messageId, text);
         }
         return [];
     }
@@ -1009,10 +1089,19 @@ export class SessionProjection {
         // The assembled message is the durable source of truth; emit it only
         // when the adapter streamed no deltas for this step (some adapters or
         // replays carry no chunk events).
-        if (reasoning.length > 0 && !this.streamedReasoning.has(key)) {
+        if (
+            reasoning.length > 0 &&
+            !this.streamedReasoning.has(key) &&
+            (process.env["DSH_ACP_SHOW_THOUGHTS"] === "1" || Number(process.env["DSH_ACP_THOUGHT_PREVIEW"] ?? 0) > 0)
+        ) {
+            const limit = Number(process.env["DSH_ACP_THOUGHT_PREVIEW"] ?? 0);
+            const text =
+                process.env["DSH_ACP_SHOW_THOUGHTS"] === "1" || !Number.isFinite(limit) || limit <= 0
+                    ? reasoning
+                    : reasoning.slice(0, limit);
             updates.push({
                 sessionUpdate: "agent_thought_chunk",
-                content: { type: "text", text: reasoning },
+                content: { type: "text", text },
                 messageId: key,
             });
         }

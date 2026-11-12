@@ -141,6 +141,8 @@ import {
     type ToolPresentView,
 } from "./translate.ts";
 import { advertisesCordis, CORDIS_CAPABILITY } from "./cordis-protocol.ts";
+import { replayAfterResponse } from "./replay-queue.ts";
+import { createToolPresenter } from "./tool-presenter.ts";
 import { AcpRpc, muxAcpStream } from "./rpc.ts";
 import type { TuiClientAdvertisement } from "./tui-client.ts";
 import * as tuiClientPlugin from "./tui-client-plugin.ts";
@@ -1267,11 +1269,17 @@ export async function apply(ctx: Context, config: AcpBridgeConfig = {}): Promise
             }
         }
         // A failed ownership claim publishes no transcript or title updates.
-        if (replay !== undefined) {
-            for (const update of replay.updates) notify(sessionId, update);
-        }
-        if (title !== undefined) {
-            notify(sessionId, { sessionUpdate: "session_info_update", title });
+        // Zed registers a loaded session only after the `session/load`
+        // response, so the replay is parked until the response is on the wire.
+        if (replay !== undefined || title !== undefined) {
+            replayAfterResponse(() => {
+                if (replay !== undefined) {
+                    for (const update of replay.updates) notify(sessionId, update);
+                }
+                if (title !== undefined) {
+                    notify(sessionId, { sessionUpdate: "session_info_update", title });
+                }
+            });
         }
         ensureSelection(record);
         queueMicrotask(() => publishCommands(sessionId));
@@ -1361,8 +1369,11 @@ export async function apply(ctx: Context, config: AcpBridgeConfig = {}): Promise
     };
 
     /** Send one update without letting a disconnected client fail an agent turn. */
+    const presentTool = createToolPresenter();
     const notify = (sessionId: string, update: SessionUpdate): void => {
-        void conn.notify("session/update", { sessionId, update }).catch((error: unknown) => {
+        const presented = presentTool.present(sessionId, update);
+        if (presented === null) return;
+        void conn.notify("session/update", { sessionId, update: presented }).catch((error: unknown) => {
             logWarn(`session/update failed: ${String(error)}`);
         });
     };
