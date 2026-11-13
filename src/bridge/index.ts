@@ -1279,6 +1279,13 @@ export async function apply(ctx: Context, config: AcpBridgeConfig = {}): Promise
                 if (title !== undefined) {
                     notify(sessionId, { sessionUpdate: "session_info_update", title });
                 }
+                if (process.env["DSH_ACP_V2"] === "1") {
+                    // Lets the v2 proxy hold back the resume response until the
+                    // replay finished, as v2 orders replay before the response.
+                    notify(sessionId, {
+                        sessionUpdate: "_dsh/replay_complete",
+                    } as unknown as SessionUpdate);
+                }
             });
         }
         ensureSelection(record);

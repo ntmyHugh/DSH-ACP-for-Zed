@@ -48,6 +48,9 @@ export interface V2ProxyOptions {
 /** Custom update the bridge uses to report autonomous goal activity. */
 const GOAL_ACTIVITY_UPDATE = "_dsh/goal_activity";
 
+/** Custom update the bridge sends when a deferred replay finished. */
+const REPLAY_COMPLETE_UPDATE = "_dsh/replay_complete";
+
 const CLIENT_FS_TERMINAL_METHODS = new Set([
     "fs/read_text_file",
     "fs/write_text_file",
@@ -77,6 +80,12 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
     let lastUserMessageId: string | undefined;
     let goalActive = false;
     let promptOpen = false;
+    // v2 orders replay before the resume response, so the response is held
+    // until the bridge reports that the replay finished.
+    let pendingResume: { id: JsonRpcId; result: unknown } | null = null;
+    // A replay can also finish before the bridge answers the resume request;
+    // remember that so the response is released immediately in that case.
+    let replayDone = false;
 
     const sendClient = (frame: Frame): void => {
         if (options.output.destroyed) return;
@@ -122,6 +131,7 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
                 };
             }
             case "session/new":
+                if (typeof value["sessionId"] === "string") currentSessionId = value["sessionId"];
                 return {
                     sessionId: value["sessionId"],
                     ...(value["configOptions"] !== undefined ? { configOptions: value["configOptions"] } : {}),
@@ -130,8 +140,8 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
                         : {}),
                 };
             case "session/load":
-                // v2 resume: replay already happened; the response only carries
-                // the current configuration.
+                // v2 resume: the proxy holds this response until the replay
+                // marker arrives; the payload only carries the configuration.
                 return {
                     ...(value["configOptions"] !== undefined ? { configOptions: value["configOptions"] } : {}),
                     ...(value["availableCommands"] !== undefined
@@ -216,6 +226,7 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
                 default:
                     break;
             }
+            if (method === "session/resume") replayDone = false;
             clientCalls.set(idKey(frame.id), { method, v2: true });
             sendBridge({ jsonrpc: "2.0", id: frame.id, method: bridgeMethod, params });
             return;
@@ -272,6 +283,21 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
             clientCalls.delete(idKey(frame.id));
             if (call !== undefined && call.v2) {
                 const translated = translateResult(call.method, frame.result);
+                if (call.method === "session/resume" && frame.id !== undefined) {
+                    if (replayDone) {
+                        replayDone = false;
+                        sendClient({ jsonrpc: "2.0", id: frame.id, result: translated });
+                        return;
+                    }
+                    pendingResume = { id: frame.id, result: translated };
+                    setTimeout(() => {
+                        if (pendingResume === null) return;
+                        const held = pendingResume;
+                        pendingResume = null;
+                        sendClient({ jsonrpc: "2.0", id: held.id, result: held.result });
+                    }, 3000);
+                    return;
+                }
                 sendClient({ jsonrpc: "2.0", id: frame.id, result: translated });
                 return;
             }
@@ -289,6 +315,16 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
                 const sessionId = params["sessionId"];
                 if (typeof sessionId === "string") currentSessionId = sessionId;
                 const update = params["update"] as { sessionUpdate?: unknown } | undefined;
+                if (update?.sessionUpdate === REPLAY_COMPLETE_UPDATE) {
+                    replayDone = true;
+                    if (pendingResume !== null) {
+                        const held = pendingResume;
+                        pendingResume = null;
+                        replayDone = false;
+                        sendClient({ jsonrpc: "2.0", id: held.id, result: held.result });
+                    }
+                    return;
+                }
                 if (update?.sessionUpdate === GOAL_ACTIVITY_UPDATE) {
                     const active = (update as Record<string, unknown>)["active"] === true;
                     goalActive = active;

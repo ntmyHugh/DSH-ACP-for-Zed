@@ -41,6 +41,13 @@ function fakeBridge(input: PassThrough, output: PassThrough): void {
                         params: { sessionId: "s-1", update: { sessionUpdate: "agent_message_chunk", messageId: "m-1", content: { type: "text", text: "hello" } } },
                     })}\n`,
                 );
+                output.write(
+                    `${JSON.stringify({
+                        jsonrpc: "2.0",
+                        method: "session/update",
+                        params: { sessionId: "s-1", update: { sessionUpdate: "_dsh/replay_complete" } },
+                    })}\n`,
+                );
                 reply({});
                 return;
             case "session/prompt":
@@ -159,10 +166,16 @@ describe("v2 proxy", () => {
         expect(result["stopReason"]).toBeUndefined();
     });
 
-    it("translates resume into a v1 session/load replay", async () => {
+    it("translates resume into a replay that lands before the response", async () => {
         const { clientIn, frames } = await createSession(2);
         clientIn.write(`${JSON.stringify({ jsonrpc: "2.0", id: 3, method: "session/resume", params: { sessionId: "s-1", cwd: "/tmp" } })}\n`);
         await waitFor(() => frames.some((frame) => frame["id"] === 3));
+        const replayIndex = frames.findIndex(
+            (frame) => frame["method"] === "session/update",
+        );
+        const responseIndex = frames.findIndex((frame) => frame["id"] === 3);
+        expect(replayIndex).toBeGreaterThanOrEqual(0);
+        expect(replayIndex).toBeLessThan(responseIndex);
         const replayed = frames
             .filter((frame) => frame["method"] === "session/update")
             .map((frame) => (frame["params"] as Record<string, unknown>)["update"] as Record<string, unknown>)
