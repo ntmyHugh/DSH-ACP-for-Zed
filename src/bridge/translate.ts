@@ -715,22 +715,32 @@ export class SessionProjection {
         return this.onChunk({ turn: located.turn, step: located.step, chunk: frame.chunk });
     }
 
-    /** Goal entries the client should keep visible above the todo list. */
+    /**
+     * Goal entries the client should keep visible above the todo list.
+     *
+     * Mirrors the harness `/goal` status view: objective, status, rounds, and
+     * the blocker reason when present. A completed goal keeps the same fields
+     * (DSH still prints its status and round count) but its entries are marked
+     * completed so the client renders them as done.
+     */
     private goalPlan(): PlanEntry[] {
         const goal = this.goalSnapshot;
         if (goal === null) return [];
         const phase = asString(goal["phase"]) ?? "";
         const status: PlanEntry["status"] =
-            phase === "completed" ? "completed" : phase === "paused" || phase === "blocked" ? "pending" : "in_progress";
+            phase === "complete" || phase === "completed" ? "completed" : phase === "paused" || phase === "blocked" ? "pending" : "in_progress";
         const entries: PlanEntry[] = [
             { content: `Goal: ${String(goal["objective"] ?? "")}`, status, priority: "high" },
         ];
+        if (phase.length > 0) {
+            entries.push({ content: `Status: ${phase}`, status, priority: "medium" });
+        }
         const roundsStarted = goal["roundsStarted"];
         const maxRounds = goal["maxGoalRounds"];
         if (roundsStarted !== undefined || maxRounds !== undefined) {
             entries.push({
-                content: `Round ${String(roundsStarted ?? 0)}/${String(maxRounds ?? "?")}`,
-                status: "pending",
+                content: `Rounds: ${String(roundsStarted ?? 0)}/${String(maxRounds ?? "?")}`,
+                status,
                 priority: "low",
             });
         }
