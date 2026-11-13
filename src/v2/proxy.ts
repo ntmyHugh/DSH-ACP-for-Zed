@@ -23,6 +23,7 @@ import { randomUUID } from "node:crypto";
 import { PassThrough, type Readable, type Writable } from "node:stream";
 import { createInterface, type Interface as LineInterface } from "node:readline";
 
+import { flushReplays } from "../bridge/replay-queue.ts";
 import { idleState, mapStopReason, runningState, translateUpdate, type V2Update } from "./updates.ts";
 
 type JsonRpcId = string | number;
@@ -197,6 +198,8 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
             }
 
             const params = { ...(frame.params ?? {}) } as Record<string, unknown>;
+            // The v1 bridge expects the array form; omitting it skips replay.
+            if (params["mcpServers"] === undefined) params["mcpServers"] = [];
             let bridgeMethod = method;
             switch (method) {
                 case "session/resume":
@@ -284,6 +287,9 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
             if (call !== undefined && call.v2) {
                 const translated = translateResult(call.method, frame.result);
                 if (call.method === "session/resume" && frame.id !== undefined) {
+                    // The bridge parks the replay until a response frame reaches
+                    // stdout; the proxy holds that frame, so flush it here.
+                    flushReplays();
                     if (replayDone) {
                         replayDone = false;
                         sendClient({ jsonrpc: "2.0", id: frame.id, result: translated });
