@@ -93,6 +93,27 @@ function asString(value: unknown): string | undefined {
 }
 
 /**
+ * Human text for a goal blocker. DSH persists blockers as `{ code, message }`
+ * (the code is a stable machine value such as `model-reported`); clients show
+ * the message, never the raw object.
+ */
+function blockedText(value: unknown): string {
+    if (typeof value === "string") return value;
+    if (value !== null && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        const message = asString(record["message"]) ?? asString(record["reason"]) ?? asString(record["description"]);
+        const code = asString(record["code"]);
+        if (message !== undefined) return code !== undefined ? `${message} (${code})` : message;
+        if (code !== undefined) return code;
+    }
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}
+
+/**
  * The 1-based line a call is anchored to, when its arguments carry one:
  * `read`-style `offset`, or `str_replace_editor`'s 0-based `insert_line`
  * (ACP lines are 1-based, so the insertion point is `insert_line + 1`).
@@ -746,7 +767,7 @@ export class SessionProjection {
         }
         const blocked = goal["blockedReason"];
         if (blocked !== undefined && blocked !== null) {
-            entries.push({ content: `Blocked: ${String(blocked)}`, status: "pending", priority: "high" });
+            entries.push({ content: `Blocked: ${blockedText(blocked)}`, status: "pending", priority: "high" });
         }
         return entries;
     }
