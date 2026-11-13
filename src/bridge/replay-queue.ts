@@ -31,6 +31,9 @@ function replayQueue(): ReplayQueue {
 /** Park a replay closure until the current request's response has been written. */
 export function replayAfterResponse(replay: () => void): void {
     replayQueue().pending.push(replay);
+    // 兜底：即使传输层没能识别响应帧，也在 800ms 后强制回放，
+    // 保证历史不会因为写路径变化而永远卡在队列里。
+    setTimeout(() => flushReplays(), 800).unref?.();
 }
 
 /** Run every parked replay closure in arrival order. Never throws. */

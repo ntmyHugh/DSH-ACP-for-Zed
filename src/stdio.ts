@@ -25,8 +25,14 @@ function installReplayFlush(): void {
         try {
             const chunk = args[0];
             const text =
-                typeof chunk === "string" ? chunk : Buffer.isBuffer(chunk) ? chunk.toString("utf8") : "";
-            if (text.includes('"id"') && !text.includes('"method"')) flushReplays();
+                typeof chunk === "string"
+                    ? chunk
+                    : chunk instanceof Uint8Array
+                      ? Buffer.from(chunk).toString("utf8")
+                      : "";
+            if (text.includes('"id"') && !text.includes('"method"')) {
+                flushReplays();
+            }
         } catch {
             // The response path must never fail because of the flush probe.
         }
