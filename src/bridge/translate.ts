@@ -842,6 +842,15 @@ export class SessionProjection {
                         };
                     }
                 }
+                // ACP v2 clients learn about autonomous goal rounds through
+                // state updates; v1 clients never see this custom update.
+                if (process.env["DSH_ACP_V2"] === "1") {
+                    const phase = asString(this.goalSnapshot?.["phase"]);
+                    return [
+                        { sessionUpdate: "plan", entries: this.mergedPlan() },
+                        { sessionUpdate: "_dsh/goal_activity", active: phase === "active" } as unknown as SessionUpdate,
+                    ];
+                }
                 return [{ sessionUpdate: "plan", entries: this.mergedPlan() }];
             }
             case "user/message": {
