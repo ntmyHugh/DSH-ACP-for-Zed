@@ -148,7 +148,13 @@ export function createToolPresenter(): ToolPresenter {
             }
 
             const isExec = state.kind === "execute";
-            const base = typeof trimmed["name"] === "string" ? (trimmed["name"] as string) : (state.kind ?? "tool");
+            const updateTitle = typeof trimmed["title"] === "string" ? (trimmed["title"] as string) : undefined;
+            const base =
+                updateTitle !== undefined && updateTitle.length > 0
+                    ? updateTitle
+                    : typeof trimmed["name"] === "string"
+                      ? (trimmed["name"] as string)
+                      : (state.kind ?? "tool");
 
             if (mode === "minimal") {
                 if (isExec) trimmed["title"] = base;

@@ -177,7 +177,13 @@ export function classifyToolCall(name: string, rawArguments: string): ToolCallFa
         case "pwsh": {
             const command = asString(args["command"]);
             const restart = args["restart"] === true;
-            return facts("execute", command !== undefined ? firstLine(command) : restart ? `Restart ${name}` : name);
+            // DSH renders `运行命令：<description>`; prefer the human summary so
+            // editors show the same card title instead of the script's first line.
+            const description = asString(args["description"]);
+            const title =
+                description ??
+                (command !== undefined ? firstLine(command) : restart ? `Restart ${name}` : name);
+            return facts("execute", title);
         }
         case "read":
             return facts("read", path !== undefined ? `Read ${path}` : "Read file");
