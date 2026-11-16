@@ -1,3 +1,4 @@
+import { proxyActive } from "../v2/mode.ts";
 /**
  * Pure translation between the DeepSeek Harness session-event log and ACP
  * session updates.
@@ -844,7 +845,7 @@ export class SessionProjection {
                 }
                 // ACP v2 clients learn about autonomous goal rounds through
                 // state updates; v1 clients never see this custom update.
-                if (process.env["DSH_ACP_V2"] === "1") {
+                if (proxyActive()) {
                     const phase = asString(this.goalSnapshot?.["phase"]);
                     return [
                         { sessionUpdate: "plan", entries: this.mergedPlan() },

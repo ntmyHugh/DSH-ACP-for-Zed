@@ -1,3 +1,4 @@
+import { proxyActive } from "../v2/mode.ts";
 /**
  * The DeepSeek Harness ACP bridge — an editor-grade Agent Client Protocol
  * server over JSON-RPC stdio, mounted as a cordis plugin inside a booted
@@ -1279,7 +1280,7 @@ export async function apply(ctx: Context, config: AcpBridgeConfig = {}): Promise
                 if (title !== undefined) {
                     notify(sessionId, { sessionUpdate: "session_info_update", title });
                 }
-                if (process.env["DSH_ACP_V2"] === "1") {
+                if (proxyActive()) {
                     // Lets the v2 proxy hold back the resume response until the
                     // replay finished, as v2 orders replay before the response.
                     notify(sessionId, {

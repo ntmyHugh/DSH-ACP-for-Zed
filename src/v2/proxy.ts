@@ -312,7 +312,14 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
         }
 
         if (isMethod(frame.method)) {
+            const incoming = (frame.params ?? {})["update"] as { sessionUpdate?: unknown } | undefined;
+            const internalMarker =
+                frame.method === "session/update" &&
+                typeof incoming?.sessionUpdate === "string" &&
+                incoming.sessionUpdate.startsWith("_dsh/");
             if (!v2) {
+                // Internal markers are ours; they never belong on the wire.
+                if (internalMarker) return;
                 sendClient(frame);
                 return;
             }

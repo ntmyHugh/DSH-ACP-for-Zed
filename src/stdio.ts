@@ -3,6 +3,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 
 import { nodeAcpStream } from "./bundle.ts";
+import { markProxyActive, proxyForcedOff } from "./v2/mode.ts";
 import { startV2Proxy } from "./v2/proxy.ts";
 import { flushReplays } from "./bridge/replay-queue.ts";
 import type { AcpServer } from "./server.ts";
@@ -44,14 +45,16 @@ function installReplayFlush(): void {
 export function apply(ctx: Context): unknown {
     installReplayFlush();
     const server = ctx.get("acpServer") as AcpServer;
-    if (process.env["DSH_ACP_V2"] === "1") {
-        // Opt-in ACP v2 transport: keep the v1 bridge as the engine and let the
-        // proxy translate the client-visible protocol.
-        return startV2Proxy({
-            input: process.stdin,
-            output: process.stdout,
-            connect: (input, output) => server.connect(nodeAcpStream(input, output)),
-        });
+    if (proxyForcedOff()) {
+        return server.connect(nodeAcpStream(process.stdin, process.stdout));
     }
-    return server.connect(nodeAcpStream(process.stdin, process.stdout));
+    // The proxy always mounts: it passes v1 clients through untouched and
+    // translates for clients that negotiate protocol version 2. No environment
+    // variable is needed; `DSH_ACP_V2=0` restores the raw transport.
+    markProxyActive();
+    return startV2Proxy({
+        input: process.stdin,
+        output: process.stdout,
+        connect: (input, output) => server.connect(nodeAcpStream(input, output)),
+    });
 }
