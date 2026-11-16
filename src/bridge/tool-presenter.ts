@@ -73,7 +73,9 @@ export function createToolPresenter(): ToolPresenter {
     ): SessionUpdate | null => {
         const merge = process.env["DSH_ACP_TOOL_MERGE"] === "1";
         if (!merge) {
-            return { ...update, title: title + elapsed(state.start) } as SessionUpdate;
+            // One card per call, titled by the command description. No elapsed
+            // suffix: the harness shows the duration in the UI chrome instead.
+            return { ...update, title } as SessionUpdate;
         }
         const callId = String(update["toolCallId"]);
         const group = execGroups.get(sessionId);
