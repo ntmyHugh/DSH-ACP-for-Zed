@@ -1219,6 +1219,15 @@ export class SessionProjection {
             presented !== undefined
                 ? factsFromPresentCall(name, rawArguments, presented)
                 : classifyToolCall(name, rawArguments);
+        // The host's own card title for an execute call is the command line;
+        // editors should show the human description instead (DSH renders it as
+        // `运行命令：<description>`).
+        if ((name === "bash" || name === "pwsh") && parsedArgs !== null && typeof parsedArgs === "object") {
+            const description = (parsedArgs as Record<string, unknown>)["description"];
+            if (typeof description === "string" && description.length > 0) {
+                return this.absolutePaths({ ...facts, title: description });
+            }
+        }
         return this.absolutePaths(facts);
     }
 
