@@ -666,7 +666,7 @@ describe("SessionProjection tool calls", () => {
             status: "completed",
             // Command output renders as a fenced block (raw text does not
             // render in every client's tool-call card).
-            content: [{ type: "content", content: { type: "text", text: "```sh\na.ts\n```\n" } }],
+            content: [{ type: "content", content: { type: "text", text: "```sh\n$ ls\na.ts\n```\n" } }],
         });
         expect(done[0]).toMatchObject({ rawOutput: { output: "a.ts\n", isError: false } });
         expect(done).toHaveLength(1);
@@ -679,10 +679,10 @@ describe("SessionProjection tool calls", () => {
             sessionUpdate: "tool_call_update",
             toolCallId: "live",
             status: "in_progress",
-            content: [{ type: "content", content: { type: "text", text: "hello" } }],
+            content: [{ type: "content", content: { type: "text", text: "$ echo hello\nhello" } }],
         }]);
         expect(p.streamToolOutput("live", " ")).toMatchObject([{
-            content: [{ type: "content", content: { type: "text", text: "hello " } }],
+            content: [{ type: "content", content: { type: "text", text: "$ echo hello\nhello " } }],
         }]);
         const done = p.onEvent(event("tool/result", {
             turn: 1, step: 0,
@@ -729,7 +729,7 @@ describe("SessionProjection tool calls", () => {
         expect(done[0]).toMatchObject({
             toolCallId: "direct",
             status: "completed",
-            content: [{ type: "content", content: { type: "text", text: "```sh\n/ws\n```\n" } }],
+            content: [{ type: "content", content: { type: "text", text: "```sh\n$ pwd\n/ws\n```\n" } }],
         });
         expect(done).toHaveLength(1);
     });
@@ -848,7 +848,7 @@ describe("SessionProjection tool calls", () => {
         expect(p.streamToolOutput("t1", "/w")).toMatchObject([{
             sessionUpdate: "tool_call_update",
             status: "in_progress",
-            _meta: { terminal_output: { terminal_id: "t1", data: "/w" } },
+            _meta: { terminal_output: { terminal_id: "t1", data: "$ pwd\n/w" } },
         }]);
         const done = p.onEvent(
             event("tool/result", {

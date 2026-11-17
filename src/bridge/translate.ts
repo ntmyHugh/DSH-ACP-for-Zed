@@ -89,6 +89,12 @@ function firstLine(text: string, limit = MAX_TITLE_LENGTH): string {
     return line.length > limit ? `${line.slice(0, limit - 1)}…` : line;
 }
 
+/** The command an execute tool call runs, when its raw input carries one. */
+function commandOf(rawInput: unknown): string | undefined {
+    if (rawInput === null || typeof rawInput !== "object") return undefined;
+    return asString((rawInput as Record<string, unknown>)["command"]);
+}
+
 function asString(value: unknown): string | undefined {
     return typeof value === "string" && value.length > 0 ? value : undefined;
 }
@@ -594,6 +600,8 @@ export class SessionProjection {
     private toolResultValues = new Map<string, unknown>();
     /** Live bytes already sent for each tool, used to avoid replaying them at settlement. */
     private streamedToolOutput = new Map<string, string>();
+    /** $ command line prepended to a command's expanded body. */
+    private streamedEcho = new Map<string, string>();
     /** One authoritative state per open ACP tool call. Block indexes only
      * route streaming fragments to that state; they never own lifecycle. */
     private toolCalls = new Map<string, ProjectedToolCall>();
@@ -638,16 +646,33 @@ export class SessionProjection {
     streamToolOutput(callId: string, text: string): SessionUpdate[] {
         const state = this.toolCalls.get(callId);
         if (state === undefined || text.length === 0) return [];
-        const output = ((this.streamedToolOutput.get(callId) ?? "") + text).slice(0, MAX_RESULT_TEXT);
+        const prior = this.streamedToolOutput.get(callId) ?? "";
+        const output = (prior + text).slice(0, MAX_RESULT_TEXT);
         this.streamedToolOutput.set(callId, output);
+        // Editors keep the command out of the collapsed terminal card, so the
+        // command is echoed into the expanded body: `$ command` then the result.
+        const command = commandOf(state.facts.rawInput);
+        if (prior.length === 0 && command !== undefined) {
+            this.streamedEcho.set(callId, `$ ${command}\n`);
+        }
+        const echo = prior.length === 0 && command !== undefined ? `$ ${command}\n` : "";
         const terminal = this.terminalOutput && state.facts.kind === "execute";
         return [{
             sessionUpdate: "tool_call_update",
             toolCallId: callId,
             status: "in_progress",
-            ...(terminal ? {} : { content: [{ type: "content", content: { type: "text", text: output } }] }),
             ...(terminal
-                ? { _meta: { terminal_output: { terminal_id: callId, data: text } } }
+                ? {}
+                : {
+                      content: [
+                          {
+                              type: "content",
+                              content: { type: "text", text: (this.streamedEcho.get(callId) ?? "") + output },
+                          },
+                      ],
+                  }),
+            ...(terminal
+                ? { _meta: { terminal_output: { terminal_id: callId, data: echo + text } } }
                 : {}),
         } as SessionUpdate];
     }
@@ -1325,6 +1350,7 @@ export class SessionProjection {
         const { failed, text, diffs } = extractToolResult(data);
         const streamed = this.streamedToolOutput.get(callId) ?? "";
         this.streamedToolOutput.delete(callId);
+        this.streamedEcho.delete(callId);
         const remainingText = streamed.length > 0 && text.startsWith(streamed)
             ? text.slice(streamed.length)
             : text;
@@ -1374,13 +1400,18 @@ export class SessionProjection {
         const rawOutput = text.length > 0 ? { output: text, isError: failed } : undefined;
         const content: ToolCallContent[] = diffContents(effectiveDiffs);
         const isCommand = facts?.kind === "execute";
+        // Echo the command into the expanded body: editors keep it out of the
+        // collapsed terminal card, so `$ command` plus the result is what the
+        // expanded card should show.
+        const commandEcho = isCommand ? commandOf(facts?.rawInput) : undefined;
+        const echo = commandEcho !== undefined ? `$ ${commandEcho}\n` : "";
         if (text.length > 0 && effectiveDiffs.length === 0 && !(this.terminalOutput && isCommand)) {
             // Fenced output renders in tool-call cards (raw text does not in
             // every client); markdown-ish tool output passes through as is.
             const block: AcpContentBlock = {
                 type: "text",
                 text: isCommand && streamed.length === 0
-                    ? `\`\`\`sh\n${text.replace(/\n+$/, "")}\n\`\`\`\n`
+                    ? `\`\`\`sh\n${echo}${text.replace(/\n+$/, "")}\n\`\`\`\n`
                     : text,
             };
             content.push({ type: "content", content: block });
@@ -1403,7 +1434,12 @@ export class SessionProjection {
                             ...(this.terminalOutput && isCommand
                                 ? {
                                     ...(remainingText.length > 0
-                                        ? { terminal_output: { terminal_id: callId, data: remainingText } }
+                                        ? {
+                                              terminal_output: {
+                                                  terminal_id: callId,
+                                                  data: (streamed.length === 0 ? echo : "") + remainingText,
+                                              },
+                                          }
                                         : {}),
                                     terminal_exit: { terminal_id: callId, exit_code: failed ? 1 : 0, signal: null },
                                 }
