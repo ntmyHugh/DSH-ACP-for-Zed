@@ -1199,4 +1199,20 @@ describe("turnEndToStopReason", () => {
         expect(turnEndToStopReason({ kind: "aborted", reason: { kind: "hook" } })).toBe("end_turn");
         expect(turnEndToStopReason(undefined)).toBe("end_turn");
     });
+    it("marks goal rounds and turn endings for the v2 proxy", () => {
+        const holder = globalThis as unknown as Record<symbol, boolean>;
+        holder[Symbol.for("dsh-acp.v2-proxy-active")] = true;
+        try {
+            const p = new SessionProjection();
+            const goal = p.onEvent(event("user/message", {
+                source: { kind: "goal" },
+                content: [{ type: "text", text: "<goal_round> Round: 9/256" }],
+            }));
+            expect(goal[0]).toMatchObject({ sessionUpdate: "_dsh/goal_activity", active: true });
+            const end = p.onEvent(event("turn/end", { turn: 1, reason: { kind: "end_turn" } }));
+            expect(end.some((u) => (u as Record<string, unknown>)["sessionUpdate"] === "_dsh/goal_activity" && (u as Record<string, unknown>)["active"] === false)).toBe(true);
+        } finally {
+            delete holder[Symbol.for("dsh-acp.v2-proxy-active")];
+        }
+    });
 });

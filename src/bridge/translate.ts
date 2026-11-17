@@ -905,21 +905,34 @@ export class SessionProjection {
                           .map((block) => block["text"] as string)
                           .join("")
                     : "";
-                return [
-                    {
-                        sessionUpdate: "session_info_update",
-                        _meta: {
-                            dsh: {
-                                event: "user/message",
-                                source: kind,
-                                preview: Array.from(text).slice(0, 160).join(""),
-                            },
+                const updates: SessionUpdate[] = [];
+                if (kind === "goal" && proxyActive()) {
+                    // The continuation driver starts a round without a client
+                    // prompt; tell v2 clients the session is running again.
+                    updates.push({ sessionUpdate: "_dsh/goal_activity", active: true } as unknown as SessionUpdate);
+                }
+                updates.push({
+                    sessionUpdate: "session_info_update",
+                    _meta: {
+                        dsh: {
+                            event: "user/message",
+                            source: kind,
+                            preview: Array.from(text).slice(0, 160).join(""),
                         },
-                    } as SessionUpdate,
-                ];
+                    },
+                } as SessionUpdate);
+                return updates;
             }
-            case "turn/end":
-                return this.onTurnEnd(data);
+            case "turn/end": {
+                const updates = this.onTurnEnd(data);
+                if (proxyActive()) {
+                    updates.push({
+                        sessionUpdate: "_dsh/goal_activity",
+                        active: false,
+                    } as unknown as SessionUpdate);
+                }
+                return updates;
+            }
             case "request/context": {
                 const contextWindow = data["contextWindow"];
                 if (typeof contextWindow === "number" && contextWindow > 0) this.contextWindow = contextWindow;
