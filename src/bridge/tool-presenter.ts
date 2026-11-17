@@ -31,6 +31,8 @@ interface ToolMeta {
     kind?: string;
     name?: string;
     path?: string;
+    /** Best human title seen for this call; result updates often degrade to the kind name. */
+    title?: string;
 }
 
 interface ExecGroup {
@@ -150,13 +152,19 @@ export function createToolPresenter(): ToolPresenter {
             }
 
             const isExec = state.kind === "execute";
-            const updateTitle = typeof trimmed["title"] === "string" ? (trimmed["title"] as string) : undefined;
+            const rawTitle = typeof trimmed["title"] === "string" ? (trimmed["title"] as string) : undefined;
+            const generic =
+                rawTitle === undefined ||
+                rawTitle.length === 0 ||
+                rawTitle === state.kind ||
+                rawTitle === state.name ||
+                (isExec && rawTitle === "execute");
+            // Result updates often carry only the kind as their title; keep the
+            // informative one captured when the call started.
+            if (!generic && rawTitle !== undefined) state.title = rawTitle;
             const base =
-                updateTitle !== undefined && updateTitle.length > 0
-                    ? updateTitle
-                    : typeof trimmed["name"] === "string"
-                      ? (trimmed["name"] as string)
-                      : (state.kind ?? "tool");
+                state.title ??
+                (state.name !== undefined ? state.name : (state.kind ?? "tool"));
 
             if (mode === "minimal") {
                 if (isExec) trimmed["title"] = base;
