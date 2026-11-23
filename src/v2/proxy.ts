@@ -153,6 +153,13 @@ export function startV2Proxy(options: V2ProxyOptions): { close: () => void } {
                 const stopReason = mapStopReason(value["stopReason"]);
                 if (!goalActive) {
                     setState(idleState(stopReason));
+                } else {
+                    // The command turn (`/goal ...`) settles before the goal
+                    // round starts. Clients drop to idle as soon as the prompt
+                    // response arrives, so re-assert running after that frame.
+                    setImmediate(() => {
+                        if (goalActive) setState(runningState());
+                    });
                 }
                 promptOpen = false;
                 return { messageId: lastUserMessageId ?? randomUUID() };
