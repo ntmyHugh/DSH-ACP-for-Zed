@@ -926,9 +926,14 @@ export class SessionProjection {
             case "turn/end": {
                 const updates = this.onTurnEnd(data);
                 if (proxyActive()) {
+                    // A turn may end while the durable goal is still active
+                    // (for example the short turn that runs `/goal ...`, or
+                    // the gap between two autonomous rounds). Only report
+                    // idle when no goal is driving the session.
+                    const goalPhase = asString(this.goalSnapshot?.["phase"]);
                     updates.push({
                         sessionUpdate: "_dsh/goal_activity",
-                        active: false,
+                        active: goalPhase === "active",
                     } as unknown as SessionUpdate);
                 }
                 return updates;

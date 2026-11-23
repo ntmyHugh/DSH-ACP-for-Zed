@@ -1209,8 +1209,26 @@ describe("turnEndToStopReason", () => {
                 content: [{ type: "text", text: "<goal_round> Round: 9/256" }],
             }));
             expect(goal[0]).toMatchObject({ sessionUpdate: "_dsh/goal_activity", active: true });
-            const end = p.onEvent(event("turn/end", { turn: 1, reason: { kind: "end_turn" } }));
-            expect(end.some((u) => (u as Record<string, unknown>)["sessionUpdate"] === "_dsh/goal_activity" && (u as Record<string, unknown>)["active"] === false)).toBe(true);
+
+            // `turn/end` without a durable goal ends the running state.
+            const noGoal = new SessionProjection();
+            const idle = noGoal.onEvent(event("turn/end", { turn: 1, reason: { kind: "end_turn" } }));
+            expect(idle.some((u) => (u as Record<string, unknown>)["sessionUpdate"] === "_dsh/goal_activity" && (u as Record<string, unknown>)["active"] === false)).toBe(true);
+
+            // A short turn (like the `/goal ...` command) ends while the goal
+            // is still active: the session keeps running.
+            p.onEvent(event("goal/change", {
+                operation: "set",
+                roundsStarted: 1,
+                goal: { id: "g", revision: 1, phase: "active", activation: "armed", objective: "x", roundsStarted: 0, maxGoalRounds: 10 },
+            }));
+            const activeEnd = p.onEvent(event("turn/end", { turn: 2, reason: { kind: "end_turn" } }));
+            expect(activeEnd.some((u) => (u as Record<string, unknown>)["sessionUpdate"] === "_dsh/goal_activity" && (u as Record<string, unknown>)["active"] === true)).toBe(true);
+
+            // Clearing the goal lets the next turn end settle as idle.
+            p.onEvent(event("goal/change", { operation: "clear" }));
+            const clearedEnd = p.onEvent(event("turn/end", { turn: 3, reason: { kind: "end_turn" } }));
+            expect(clearedEnd.some((u) => (u as Record<string, unknown>)["sessionUpdate"] === "_dsh/goal_activity" && (u as Record<string, unknown>)["active"] === false)).toBe(true);
         } finally {
             delete holder[Symbol.for("dsh-acp.v2-proxy-active")];
         }
